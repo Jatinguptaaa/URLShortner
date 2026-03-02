@@ -84,6 +84,6 @@ app.get('/api/shorturl/:short_url', function(req, res) {
   return res.redirect(302, entry.original_url);
 });
 
-app.listen(port, function() {
-  console.log(`Listening on port ${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
 });
