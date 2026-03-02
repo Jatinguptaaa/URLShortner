@@ -76,7 +76,7 @@ app.get('/api/shorturl/:short_url', function(req, res) {
     return res.json({ error: 'No short URL found' });
   }
 
-  res.redirect(entry.original_url);
+  res.redirect(302, entry.original_url);   
 
 });
 
