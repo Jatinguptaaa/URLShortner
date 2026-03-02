@@ -68,15 +68,21 @@ app.post('/api/shorturl', function(req, res) {
 
 app.get('/api/shorturl/:short_url', function(req, res) {
 
-  const shortUrl = parseInt(req.params.short_url);
+  // Explicit CORS headers for FCC tests
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
 
+  const shortUrl = parseInt(req.params.short_url);
   const entry = urlDatabase.find(u => u.short_url === shortUrl);
 
   if (!entry) {
-    return res.json({ error: 'No short URL found' });
+    return res.status(404).json({ error: 'No short URL found' });
   }
 
-  res.redirect(302, entry.original_url);   
+  // Manual redirect
+  res.status(302);
+  res.set('Location', entry.original_url);
+  res.end();
 
 });
 
