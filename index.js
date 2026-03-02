@@ -31,11 +31,17 @@ app.post('/api/shorturl', function(req, res) {
 
   const originalUrl = req.body.url;
 
+  // Must start with http or https
+  const urlRegex = /^https?:\/\/.+/;
+
+  if (!urlRegex.test(originalUrl)) {
+    return res.json({ error: 'invalid url' });
+  }
+
   try {
     const parsedUrl = new URL(originalUrl);
 
     dns.lookup(parsedUrl.hostname, (err) => {
-
       if (err) {
         return res.json({ error: 'invalid url' });
       }
