@@ -37,31 +37,33 @@ app.post('/api/shorturl', function(req, res) {
   try {
     const parsedUrl = new URL(originalUrl);
 
-    // Must be http or https
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return res.json({ error: 'invalid url' });
     }
 
-    dns.lookup(parsedUrl.hostname, (err) => {
+    dns.lookup(parsedUrl.hostname, { family: 4 }, (err) => {
       if (err) {
         return res.json({ error: 'invalid url' });
       }
 
-      const shortUrl = counter++;
+      // IMPORTANT: ensure push happens before response
+      const shortUrl = counter;
 
       urlDatabase.push({
         original_url: originalUrl,
         short_url: shortUrl
       });
 
-      res.json({
+      counter++;
+
+      return res.json({
         original_url: originalUrl,
         short_url: shortUrl
       });
     });
 
   } catch (err) {
-    res.json({ error: 'invalid url' });
+    return res.json({ error: 'invalid url' });
   }
 
 });
@@ -71,7 +73,7 @@ app.post('/api/shorturl', function(req, res) {
 */
 app.get('/api/shorturl/:short_url', function(req, res) {
 
-  const shortUrl = parseInt(req.params.short_url);
+  const shortUrl = Number(req.params.short_url);
 
   const entry = urlDatabase.find(u => u.short_url === shortUrl);
 
@@ -79,8 +81,7 @@ app.get('/api/shorturl/:short_url', function(req, res) {
     return res.json({ error: 'No short URL found' });
   }
 
-  res.redirect(entry.original_url);
-
+  return res.redirect(302, entry.original_url);
 });
 
 app.listen(port, function() {
