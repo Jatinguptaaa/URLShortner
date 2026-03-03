@@ -58,8 +58,7 @@ app.post('/api/shorturl', async (req, res) => {
         return res.json({ error: 'invalid url' });
       }
 
-      // Check if already exists
-      const existing = await Url.findOne({ original_url: originalUrl });
+      const existing = await Url.findOne({ original_url: parsedUrl.href });
 
       if (existing) {
         return res.json({
@@ -68,19 +67,18 @@ app.post('/api/shorturl', async (req, res) => {
         });
       }
 
-      // Generate new short id
-      const count = await Url.countDocuments();
-      const shortId = count + 1;
+      const last = await Url.findOne().sort({ short_url: -1 });
+      const shortId = last ? last.short_url + 1 : 1;
 
       const newUrl = new Url({
-        original_url: originalUrl,
+        original_url: parsedUrl.href,
         short_url: shortId
       });
 
       await newUrl.save();
 
       return res.json({
-        original_url: originalUrl,
+        original_url: parsedUrl.href,
         short_url: shortId
       });
     });
@@ -94,9 +92,9 @@ app.post('/api/shorturl', async (req, res) => {
    REDIRECT
 ======================== */
 
-app.get('/api/shorturl/:short_url', async (req, res) => {
+app.get('/api/shorturl/:short_url', async function(req, res) {
 
-  const shortUrl = parseInt(req.params.short_url);
+  const shortUrl = Number(req.params.short_url);
 
   const entry = await Url.findOne({ short_url: shortUrl });
 
@@ -104,7 +102,7 @@ app.get('/api/shorturl/:short_url', async (req, res) => {
     return res.json({ error: 'No short URL found' });
   }
 
-  return res.redirect(entry.original_url);
+  return res.redirect(302, entry.original_url);
 });
 
 /* ========================
