@@ -2,11 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const dns = require('dns');
+const mongoose = require('mongoose');
 const { URL } = require('url');
 
 const app = express();
-
-// Basic Configuration
 const port = process.env.PORT || 3000;
 
 app.use(cors());
@@ -14,23 +13,39 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.set('trust proxy', true);
 
-app.use('/public', express.static(`${process.cwd()}/public`));
+app.use('/public', express.static(process.cwd() + '/public'));
 
-let urlDatabase = [];
-let counter = 1;
-
-app.get('/', function(req, res) {
+app.get('/', (req, res) => {
   res.sendFile(process.cwd() + '/views/index.html');
 });
 
-app.get('/api/hello', function(req, res) {
+app.get('/api/hello', (req, res) => {
   res.json({ greeting: 'hello API' });
 });
 
-/*
-  POST /api/shorturl
-*/
-app.post('/api/shorturl', function(req, res) {
+/* ========================
+   MONGOOSE CONNECTION
+======================== */
+
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.log(err));
+
+const urlSchema = new mongoose.Schema({
+  original_url: String,
+  short_url: Number
+});
+
+const Url = mongoose.model('Url', urlSchema);
+
+/* ========================
+   POST SHORT URL
+======================== */
+
+app.post('/api/shorturl', async (req, res) => {
 
   const originalUrl = req.body.url;
 
@@ -41,48 +56,63 @@ app.post('/api/shorturl', function(req, res) {
       return res.json({ error: 'invalid url' });
     }
 
-    dns.lookup(parsedUrl.hostname, { family: 4 }, (err) => {
+    dns.lookup(parsedUrl.hostname, async (err) => {
       if (err) {
         return res.json({ error: 'invalid url' });
       }
 
-      // IMPORTANT: ensure push happens before response
-      const shortUrl = counter;
+      // Check if already exists
+      const existing = await Url.findOne({ original_url: originalUrl });
 
-      urlDatabase.push({
+      if (existing) {
+        return res.json({
+          original_url: existing.original_url,
+          short_url: existing.short_url
+        });
+      }
+
+      // Generate new short id
+      const count = await Url.countDocuments();
+      const shortId = count + 1;
+
+      const newUrl = new Url({
         original_url: originalUrl,
-        short_url: shortUrl
+        short_url: shortId
       });
 
-      counter++;
+      await newUrl.save();
 
       return res.json({
         original_url: originalUrl,
-        short_url: shortUrl
+        short_url: shortId
       });
     });
 
   } catch (err) {
     return res.json({ error: 'invalid url' });
   }
-
 });
 
-/*
-  GET /api/shorturl/:short_url
-*/
-app.get('/api/shorturl/:short_url', function(req, res) {
+/* ========================
+   REDIRECT
+======================== */
 
-  const shortUrl = Number(req.params.short_url);
+app.get('/api/shorturl/:short_url', async (req, res) => {
 
-  const entry = urlDatabase.find(u => u.short_url === shortUrl);
+  const shortUrl = parseInt(req.params.short_url);
+
+  const entry = await Url.findOne({ short_url: shortUrl });
 
   if (!entry) {
     return res.json({ error: 'No short URL found' });
   }
 
-  return res.redirect(302, entry.original_url);
+  return res.redirect(entry.original_url);
 });
+
+/* ========================
+   START SERVER
+======================== */
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);
